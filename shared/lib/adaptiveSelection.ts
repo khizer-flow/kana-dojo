@@ -1,4 +1,5 @@
 import { Random } from 'random-js';
+import localforage from 'localforage';
 
 /**
  * Adaptive Weighted Selection System
@@ -11,9 +12,13 @@ import { Random } from 'random-js';
  * 3. Streak awareness - consecutive misses compound weight with diminishing returns
  * 4. Minimum floor - mastered characters still appear occasionally
  * 5. Exploration factor - ensures variety even among difficult characters
+ * 6. Persistent storage using localforage (IndexedDB) for large datasets
  */
 
 const random = new Random();
+
+// Storage key prefix for localforage
+const STORAGE_KEY = 'kanadojo-adaptive-weights';
 
 export interface CharacterWeight {
   correct: number;
@@ -24,14 +29,84 @@ export interface CharacterWeight {
   consecutiveWrong: number;
 }
 
+// Serializable format for storage
+interface StoredWeights {
+  version: number;
+  lastUpdated: number;
+  weights: Record<string, CharacterWeight>;
+}
+
 /**
- * Creates a new adaptive selection instance.
+ * Creates a new adaptive selection instance with optional persistence.
  * Each instance maintains its own weight tracking, allowing different
  * game modes to have independent tracking.
  */
-export function createAdaptiveSelector() {
-  // Session-based weight tracking (resets when instance is recreated)
+export function createAdaptiveSelector(storageKey?: string) {
+  // Session-based weight tracking
   const characterWeights: Map<string, CharacterWeight> = new Map();
+  let isLoaded = false;
+  let loadPromise: Promise<void> | null = null;
+  const persistKey = storageKey ? `${STORAGE_KEY}-${storageKey}` : STORAGE_KEY;
+
+  // Debounced save to avoid excessive writes
+  let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+  const SAVE_DEBOUNCE_MS = 2000; // Save at most every 2 seconds
+
+  /**
+   * Load weights from persistent storage
+   */
+  const loadFromStorage = async (): Promise<void> => {
+    if (isLoaded) return;
+    if (loadPromise) return loadPromise;
+
+    loadPromise = (async () => {
+      try {
+        const stored = await localforage.getItem<StoredWeights>(persistKey);
+        if (stored && stored.weights) {
+          // Convert stored object back to Map
+          Object.entries(stored.weights).forEach(([char, weight]) => {
+            // Filter out stale recentMisses (older than 2 minutes)
+            const now = Date.now();
+            weight.recentMisses = weight.recentMisses.filter(
+              t => now - t < 120000
+            );
+            characterWeights.set(char, weight);
+          });
+          console.log(
+            `[AdaptiveSelection] Loaded ${characterWeights.size} character weights from storage`
+          );
+        }
+      } catch (error) {
+        console.warn('[AdaptiveSelection] Failed to load from storage:', error);
+      }
+      isLoaded = true;
+    })();
+
+    return loadPromise;
+  };
+
+  /**
+   * Save weights to persistent storage (debounced)
+   */
+  const saveToStorage = (): void => {
+    // Debounce saves to avoid excessive writes
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+    }
+
+    saveTimeout = setTimeout(async () => {
+      try {
+        const stored: StoredWeights = {
+          version: 1,
+          lastUpdated: Date.now(),
+          weights: Object.fromEntries(characterWeights)
+        };
+        await localforage.setItem(persistKey, stored);
+      } catch (error) {
+        console.warn('[AdaptiveSelection] Failed to save to storage:', error);
+      }
+    }, SAVE_DEBOUNCE_MS);
+  };
 
   // Sigmoid function for smooth, bounded transformations
   const sigmoid = (
@@ -192,6 +267,9 @@ export function createAdaptiveSelector() {
       }
       existing.lastSeen = now;
     }
+
+    // Trigger debounced save to persistent storage
+    saveToStorage();
   };
 
   /**
@@ -215,14 +293,22 @@ export function createAdaptiveSelector() {
         consecutiveWrong: 0
       });
     }
+    // Note: We don't save on markCharacterSeen to reduce writes
+    // Updates will be saved when updateCharacterWeight is called
   };
 
   /**
    * Reset all character weights.
    * Useful when starting a new training session.
    */
-  const reset = (): void => {
+  const reset = async (): Promise<void> => {
     characterWeights.clear();
+    try {
+      await localforage.removeItem(persistKey);
+      console.log('[AdaptiveSelection] Cleared all weights from storage');
+    } catch (error) {
+      console.warn('[AdaptiveSelection] Failed to clear storage:', error);
+    }
   };
 
   /**
@@ -235,12 +321,62 @@ export function createAdaptiveSelector() {
     return characterWeights.get(char);
   };
 
+  /**
+   * Get statistics about the current weight data.
+   */
+  const getStats = () => {
+    const entries = Array.from(characterWeights.entries());
+    const totalCorrect = entries.reduce((sum, [, w]) => sum + w.correct, 0);
+    const totalWrong = entries.reduce((sum, [, w]) => sum + w.wrong, 0);
+
+    return {
+      totalCharacters: characterWeights.size,
+      totalCorrect,
+      totalWrong,
+      accuracy:
+        totalCorrect + totalWrong > 0
+          ? totalCorrect / (totalCorrect + totalWrong)
+          : 0
+    };
+  };
+
+  /**
+   * Ensure weights are loaded from storage before use.
+   * Call this during app initialization.
+   */
+  const ensureLoaded = async (): Promise<void> => {
+    await loadFromStorage();
+  };
+
+  /**
+   * Force an immediate save to storage.
+   */
+  const forceSave = async (): Promise<void> => {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    try {
+      const stored: StoredWeights = {
+        version: 1,
+        lastUpdated: Date.now(),
+        weights: Object.fromEntries(characterWeights)
+      };
+      await localforage.setItem(persistKey, stored);
+    } catch (error) {
+      console.warn('[AdaptiveSelection] Failed to force save:', error);
+    }
+  };
+
   return {
     selectWeightedCharacter,
     updateCharacterWeight,
     markCharacterSeen,
     reset,
-    getCharacterWeight
+    getCharacterWeight,
+    getStats,
+    ensureLoaded,
+    forceSave
   };
 }
 
@@ -250,25 +386,41 @@ export type AdaptiveSelector = ReturnType<typeof createAdaptiveSelector>;
 // Global selector instance for shared state across components
 // This ensures weights persist when switching between game modes in the same session
 let globalSelector: AdaptiveSelector | null = null;
+let initPromise: Promise<void> | null = null;
 
 /**
  * Get the global adaptive selector instance.
- * Creates one if it doesn't exist.
+ * Creates one if it doesn't exist and loads persisted data.
  * Use this for shared state across game modes in the same training session.
  */
 export function getGlobalAdaptiveSelector(): AdaptiveSelector {
   if (!globalSelector) {
-    globalSelector = createAdaptiveSelector();
+    globalSelector = createAdaptiveSelector('global');
+    // Start loading in background (non-blocking)
+    initPromise = globalSelector.ensureLoaded();
   }
   return globalSelector;
+}
+
+/**
+ * Wait for the global selector to finish loading persisted data.
+ * Call this during app initialization if you need to ensure data is loaded.
+ */
+export async function waitForAdaptiveSelectorReady(): Promise<void> {
+  if (!globalSelector) {
+    getGlobalAdaptiveSelector();
+  }
+  if (initPromise) {
+    await initPromise;
+  }
 }
 
 /**
  * Reset the global adaptive selector.
  * Call this when starting a completely new training session.
  */
-export function resetGlobalAdaptiveSelector(): void {
+export async function resetGlobalAdaptiveSelector(): Promise<void> {
   if (globalSelector) {
-    globalSelector.reset();
+    await globalSelector.reset();
   }
 }

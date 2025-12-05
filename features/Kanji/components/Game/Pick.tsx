@@ -16,8 +16,12 @@ import AnswerSummary from '@/shared/components/Game/AnswerSummary';
 import SSRAudioButton from '@/shared/components/SSRAudioButton';
 import FuriganaText from '@/shared/components/FuriganaText';
 import { useCrazyModeTrigger } from '@/features/CrazyMode/hooks/useCrazyModeTrigger';
+import { getGlobalAdaptiveSelector } from '@/shared/lib/adaptiveSelection';
 
 const random = new Random();
+
+// Get the global adaptive selector for weighted character selection
+const adaptiveSelector = getGlobalAdaptiveSelector();
 
 interface KanjiPickGameProps {
   selectedKanjiObjs: IKanjiObj[];
@@ -47,13 +51,15 @@ const KanjiPickGame = ({
   const { playErrorTwice } = useError();
   const { trigger: triggerCrazyMode } = useCrazyModeTrigger();
 
-  // State management based on mode
+  // State management based on mode - uses weighted selection for adaptive learning
   const [correctChar, setCorrectChar] = useState(() => {
     if (selectedKanjiObjs.length === 0) return '';
-    const index = random.integer(0, selectedKanjiObjs.length - 1);
-    return isReverse
-      ? selectedKanjiObjs[index].meanings[0]
-      : selectedKanjiObjs[index].kanjiChar;
+    const sourceArray = isReverse
+      ? selectedKanjiObjs.map(obj => obj.meanings[0])
+      : selectedKanjiObjs.map(obj => obj.kanjiChar);
+    const selected = adaptiveSelector.selectWeightedCharacter(sourceArray);
+    adaptiveSelector.markCharacterSeen(selected);
+    return selected;
   });
 
   // Find the correct object based on the current mode
@@ -172,6 +178,8 @@ const KanjiPickGame = ({
     setScore(score + 1);
     setWrongSelectedAnswers([]);
     triggerCrazyMode();
+    // Update adaptive weight system - reduces probability of mastered characters
+    adaptiveSelector.updateCharacterWeight(correctChar, true);
   };
 
   const handleWrongAnswer = (selectedOption: string) => {
@@ -185,6 +193,8 @@ const KanjiPickGame = ({
       setScore(score - 1);
     }
     triggerCrazyMode();
+    // Update adaptive weight system - increases probability of difficult characters
+    adaptiveSelector.updateCharacterWeight(correctChar, false);
   };
 
   const generateNewCharacter = () => {
@@ -192,10 +202,12 @@ const KanjiPickGame = ({
       ? selectedKanjiObjs.map(obj => obj.meanings[0])
       : selectedKanjiObjs.map(obj => obj.kanjiChar);
 
-    let newChar = sourceArray[random.integer(0, sourceArray.length - 1)];
-    while (newChar === correctChar) {
-      newChar = sourceArray[random.integer(0, sourceArray.length - 1)];
-    }
+    // Use weighted selection - prioritizes characters user struggles with
+    const newChar = adaptiveSelector.selectWeightedCharacter(
+      sourceArray,
+      correctChar
+    );
+    adaptiveSelector.markCharacterSeen(newChar);
     setCorrectChar(newChar);
   };
 

@@ -12,6 +12,14 @@ import { applyTheme } from '@/features/Preferences/data/themes';
 import BackToTop from '@/shared/components/BackToTop';
 import MobileBottomBar from '@/shared/components/BottomBar';
 import { useVisitTracker } from '@/features/Progress/hooks/useVisitTracker';
+import { getGlobalAdaptiveSelector } from '@/shared/lib/adaptiveSelection';
+
+// Initialize adaptive selector early to load persisted weights from IndexedDB
+// This runs once at module load time, ensuring weights are ready before games start
+if (typeof window !== 'undefined') {
+  const selector = getGlobalAdaptiveSelector();
+  selector.ensureLoaded().catch(console.error);
+}
 
 // Define a type for the font object for clarity, adjust as needed
 type FontObject = {
