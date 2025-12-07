@@ -52,6 +52,10 @@ const VocabCards = () => {
     state => state.setSelectedVocabSets
   );
   const addWordObjs = useVocabStore(state => state.addVocabObjs);
+  const collapsedRowsByUnit = useVocabStore(state => state.collapsedRowsByUnit);
+  const setCollapsedRowsForUnit = useVocabStore(
+    state => state.setCollapsedRowsForUnit
+  );
   const allTimeStats = useStatsStore(state => state.allTimeStats);
 
   const { playClick } = useClick();
@@ -145,7 +149,16 @@ const VocabCards = () => {
     return mastered;
   }, [allTimeStats.characterMastery]);
 
-  const [collapsedRows, setCollapsedRows] = useState<number[]>([]);
+  // Get collapsed rows for current unit from store
+  const collapsedRows = collapsedRowsByUnit[selectedVocabCollectionName] || [];
+  const setCollapsedRows = useCallback(
+    (updater: number[] | ((prev: number[]) => number[])) => {
+      const newRows =
+        typeof updater === 'function' ? updater(collapsedRows) : updater;
+      setCollapsedRowsForUnit(selectedVocabCollectionName, newRows);
+    },
+    [collapsedRows, selectedVocabCollectionName, setCollapsedRowsForUnit]
+  );
   const numColumns = useGridColumns();
 
   // Pagination state

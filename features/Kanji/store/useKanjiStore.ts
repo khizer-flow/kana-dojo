@@ -19,9 +19,15 @@ interface IKanjiState {
   addKanjiObj: (kanji: IKanjiObj) => void;
   addKanjiObjs: (kanjis: IKanjiObj[]) => void;
   clearKanjiObjs: () => void;
-  setSelectedKanjiCollection: (collection: 'n5' | 'n4' | 'n3' | 'n2' | 'n1') => void;
+  setSelectedKanjiCollection: (
+    collection: 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
+  ) => void;
   setSelectedKanjiSets: (sets: string[]) => void;
   clearKanjiSets: () => void;
+
+  // Collapsed rows per unit (keyed by collection name)
+  collapsedRowsByUnit: Record<string, number[]>;
+  setCollapsedRowsForUnit: (unit: string, rows: number[]) => void;
 }
 
 const sameKanjiArray = (a: IKanjiObj[], b: IKanjiObj[]) =>
@@ -117,7 +123,16 @@ const useKanjiStore = create<IKanjiState>(set => ({
 
   setSelectedKanjiSets: sets => set({ selectedKanjiSets: sets }),
 
-  clearKanjiSets: () => set({ selectedKanjiSets: [] })
+  clearKanjiSets: () => set({ selectedKanjiSets: [] }),
+
+  collapsedRowsByUnit: {},
+  setCollapsedRowsForUnit: (unit, rows) =>
+    set(state => ({
+      collapsedRowsByUnit: {
+        ...state.collapsedRowsByUnit,
+        [unit]: rows
+      }
+    }))
 }));
 
 export default useKanjiStore;

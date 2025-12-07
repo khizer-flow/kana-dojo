@@ -21,6 +21,10 @@ interface IFormState {
   selectedVocabSets: string[];
   setSelectedVocabSets: (sets: string[]) => void;
   clearVocabSets: () => void;
+
+  // Collapsed rows per unit (keyed by collection name)
+  collapsedRowsByUnit: Record<string, number[]>;
+  setCollapsedRowsForUnit: (unit: string, rows: number[]) => void;
 }
 
 const useVocabStore = create<IFormState>(set => ({
@@ -36,7 +40,7 @@ const useVocabStore = create<IFormState>(set => ({
         ? state.selectedVocabObjs.filter(
             currentVocabObj => currentVocabObj.word !== vocabObj.word
           )
-        : [...state.selectedVocabObjs, vocabObj],
+        : [...state.selectedVocabObjs, vocabObj]
     })),
   addVocabObjs: vocabObjs =>
     set(state => ({
@@ -51,11 +55,11 @@ const useVocabStore = create<IFormState>(set => ({
                 .map(currentVocabObj => currentVocabObj.word)
                 .includes(currentVocabObj.word)
           )
-        : [...new Set([...state.selectedVocabObjs, ...vocabObjs])],
+        : [...new Set([...state.selectedVocabObjs, ...vocabObjs])]
     })),
   clearVocabObjs: () => {
     set(() => ({
-      selectedVocabObjs: [],
+      selectedVocabObjs: []
     }));
   },
 
@@ -66,9 +70,18 @@ const useVocabStore = create<IFormState>(set => ({
   setSelectedVocabSets: sets => set({ selectedVocabSets: sets }),
   clearVocabSets: () => {
     set(() => ({
-      selectedVocabSets: [],
+      selectedVocabSets: []
     }));
   },
+
+  collapsedRowsByUnit: {},
+  setCollapsedRowsForUnit: (unit, rows) =>
+    set(state => ({
+      collapsedRowsByUnit: {
+        ...state.collapsedRowsByUnit,
+        [unit]: rows
+      }
+    }))
 }));
 
 export default useVocabStore;

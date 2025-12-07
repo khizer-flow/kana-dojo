@@ -44,6 +44,10 @@ const KanjiCards = () => {
     state => state.setSelectedKanjiSets
   );
   const addKanjiObjs = useKanjiStore(state => state.addKanjiObjs);
+  const collapsedRowsByUnit = useKanjiStore(state => state.collapsedRowsByUnit);
+  const setCollapsedRowsForUnit = useKanjiStore(
+    state => state.setCollapsedRowsForUnit
+  );
   const allTimeStats = useStatsStore(state => state.allTimeStats);
 
   const { playClick } = useClick();
@@ -121,8 +125,16 @@ const KanjiCards = () => {
   // Filter state for hiding mastered cards
   const [hideMastered, setHideMastered] = useState(false);
 
-  // Track collapsed rows for UI accordions
-  const [collapsedRows, setCollapsedRows] = useState<number[]>([]);
+  // Get collapsed rows for current unit from store
+  const collapsedRows = collapsedRowsByUnit[selectedKanjiCollectionName] || [];
+  const setCollapsedRows = useCallback(
+    (updater: number[] | ((prev: number[]) => number[])) => {
+      const newRows =
+        typeof updater === 'function' ? updater(collapsedRows) : updater;
+      setCollapsedRowsForUnit(selectedKanjiCollectionName, newRows);
+    },
+    [collapsedRows, selectedKanjiCollectionName, setCollapsedRowsForUnit]
+  );
   const numColumns = useGridColumns();
 
   // Pagination state
