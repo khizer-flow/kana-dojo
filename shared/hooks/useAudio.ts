@@ -292,26 +292,17 @@ let savedTime = 0;
 export const useChristmas = () => {
   const initChristmas = () => {
     if (typeof window !== 'undefined' && !christmasAudio) {
-      // Issue #9: Opus format with fallback
-      const opusUrl = '/sounds/mariah-carey.opus';
-      const fallbackUrl = '/sounds/mariah-carey.mp3'; // Fallback if MP3 exists
-
-      christmasAudio = new Audio();
-
-      // Try Opus first, fallback to MP3 if needed
-      if (canPlayOpus()) {
-        christmasAudio.src = opusUrl;
-      } else {
-        // Try MP3 fallback, or use Opus anyway (most browsers support it)
-        christmasAudio.src = opusUrl;
-      }
-
+      // mariah-carey.opus - Opus has excellent browser support (Chrome, Firefox, Safari 15+, Edge)
+      // No WAV fallback exists for this file, but Opus is supported in all modern browsers
+      christmasAudio = new Audio('/sounds/mariah-carey.opus');
       christmasAudio.loop = true;
       christmasAudio.volume = 0.2;
 
       // Handle load errors
       christmasAudio.onerror = () => {
-        console.warn('Failed to load Christmas audio');
+        console.warn(
+          'Failed to load Christmas audio - Opus may not be supported in this browser'
+        );
       };
     }
   };
