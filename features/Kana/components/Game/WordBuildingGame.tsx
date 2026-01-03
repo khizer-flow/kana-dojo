@@ -40,7 +40,7 @@ const isKatakana = (char: string): boolean => {
 
 // Tile styles shared between active and blank tiles
 const tileBaseStyles =
-  'relative flex items-center justify-center rounded-3xl px-6 sm:px-8 py-3 text-2xl font-medium sm:text-3xl border-b-8';
+  'relative flex items-center justify-center rounded-3xl px-6 sm:px-8 py-3 text-2xl  sm:text-3xl border-b-8';
 
 interface TileProps {
   id: string;
@@ -376,7 +376,7 @@ const WordBuildingGame = ({
 
       {/* Answer Row Area */}
       <div className='flex w-full flex-col items-center'>
-        <div className='flex min-h-[5rem] w-full items-center border-b border-[var(--border-color)] px-2 pb-2 sm:w-1/2'>
+        <div className='flex min-h-[5rem] w-full items-center border-b border-[var(--border-color)] px-2 pb-2 md:w-3/4 lg:w-2/3 xl:w-1/2'>
           <div className='flex flex-row flex-wrap justify-start gap-3'>
             {/* Render placed tiles in the answer row */}
             {placedTiles.map(char => (
@@ -444,22 +444,22 @@ const WordBuildingGame = ({
         className={clsx(
           'w-[100vw]',
           'border-t-2 border-[var(--border-color)] bg-[var(--card-color)]',
-          'absolute bottom-0 z-10 px-4 py-4 md:bottom-6',
-          'flex flex-col items-center justify-center gap-3'
+          'absolute bottom-0 z-10 px-6 py-6 md:bottom-6',
+          'flex flex-row flex-wrap items-center justify-center gap-6 md:gap-12'
         )}
       >
         {/* Feedback message for correct/wrong - Duolingo style */}
         {showContinue && (
-          <div className='flex w-full items-center gap-3 md:w-1/2'>
+          <div className='flex items-center gap-3 md:gap-4'>
             {bottomBarState === 'correct' ? (
-              <CircleCheck className='h-10 w-10 text-[var(--main-color)]' />
+              <CircleCheck className='h-12 w-12 text-[var(--main-color)]' />
             ) : (
-              <CircleX className='h-10 w-10 text-[var(--secondary-color)]' />
+              <CircleX className='h-12 w-12 text-[var(--secondary-color)]' />
             )}
             <div className='flex flex-col'>
               <span
                 className={clsx(
-                  'text-lg font-bold',
+                  'text-xl font-bold',
                   bottomBarState === 'correct'
                     ? 'text-[var(--main-color)]'
                     : 'text-[var(--secondary-color)]'
@@ -469,7 +469,7 @@ const WordBuildingGame = ({
                   ? 'Nicely done!'
                   : 'Correct solution:'}
               </span>
-              <span className='text-sm text-[var(--text-secondary-color)]'>
+              <span className='text-base font-medium text-[var(--secondary-color)]/60'>
                 {wordData.answerChars.join('')}
               </span>
             </div>
@@ -480,12 +480,11 @@ const WordBuildingGame = ({
           ref={buttonRef}
           borderBottomThickness={12}
           borderRadius='3xl'
-          className='w-full py-4 text-2xl font-medium md:w-1/2'
+          className='w-auto min-w-[12rem] px-12 py-4 text-2xl font-medium sm:px-16'
           onClick={showContinue ? handleContinue : handleCheck}
           disabled={!canCheck && !showContinue}
         >
           <span>{showContinue ? 'continue' : 'check'}</span>
-          {/* <CircleArrowRight /> */}
         </ActionButton>
       </div>
 
